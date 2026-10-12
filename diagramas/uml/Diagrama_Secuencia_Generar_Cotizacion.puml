@@ -1,0 +1,73 @@
+@startuml 03-secuencia-generar-cotizacion
+title Secuencia 2 — CU-01 Generar cotización (regla de $15,000 MXN y excepción sin diagnóstico)\nUS-004, US-005 · CA-005, CA-007 · BPMN Fase 2 «Generar cotización» y gateway «¿Monto mayor a $15,000 MXN?»
+skinparam defaultFontName Arial
+skinparam defaultFontSize 13
+skinparam shadowing false
+skinparam dpi 150
+skinparam sequenceMessageAlign center
+skinparam ParticipantPadding 14
+skinparam BoxPadding 8
+autonumber
+
+actor "Asesor de\nServicio" as Asesor
+box "Aplicación" #EAF2FB
+  participant ":ServicioDe\nCotizacion" as S
+  participant ":UnidadDe\nTrabajo" as U
+end box
+box "Dominio" #FDF2E9
+  participant ":RepositorioDe\nOrdenes" as RO
+  participant "orden:\nOrdenDeServicio" as O
+  participant ":RepositorioDe\nCotizaciones" as RC
+  participant "Cotizacion" as C
+  participant ":PoliticaPorMonto\nDeCotizacionInicial" as Pol
+end box
+box "Infraestructura" #EEF7EE
+  participant ":PublicadorDe\nAlertasInternas" as P
+  participant ":GeneradorDe\nDocumentos" as G
+end box
+actor "Gerente\nde Taller" as Gerente
+
+Asesor -> S : generar_cotizacion(numero_orden, trabajos)
+activate S
+S -> U : iniciar()
+activate U
+S -> RO : obtener(numero_orden)
+RO --> S : orden
+S -> O : marcar_cotizada()
+activate O
+alt la orden NO tiene diagnóstico registrado (excepción)
+  O --> S : error DiagnosticoRequerido
+  S -> U : deshacer()
+  note right of U : No se crea la cotización\nni cambia la orden
+  S --> Asesor : «No se puede cotizar una orden sin\ndiagnóstico registrado por el técnico»
+else la orden tiene diagnóstico (flujo normal)
+  O -> O : estado «En Diagnóstico» → «Cotizada»
+  O --> S
+  deactivate O
+  S -> C : generar(orden, Inicial, v.1, lineas, politica)
+  activate C
+  C -> C : total = suma de las líneas\n+ evento CotizacionGenerada
+  C -> Pol : requiere_aprobacion(Inicial, total)
+  Pol --> C : ¿total > $15,000?
+  alt total mayor a $15,000 MXN (regla del Gerente)
+    C -> C : estado «Pendiente de Aprobación Gerencial»\n+ evento AprobacionGerencialRequerida
+  else total menor o igual a $15,000 MXN
+    C -> C : estado «Pendiente de Autorización del Cliente»
+  end
+  C --> S : cotizacion
+  deactivate C
+  S -> RC : agregar(cotizacion)
+  S -> RO : guardar(orden)
+  S -> U : confirmar()
+  U --> S : eventos confirmados
+  deactivate U
+  S -> P : publicar(eventos)
+  opt hubo evento AprobacionGerencialRequerida
+    P -> Gerente : alerta interna «la cotización requiere su aprobación»
+  end
+  S -> G : generar_pdf_de_cotizacion(cotizacion)
+  G --> S : PDF
+  S --> Asesor : resultado: número, «v.1», estado, total y PDF
+end
+deactivate S
+@enduml

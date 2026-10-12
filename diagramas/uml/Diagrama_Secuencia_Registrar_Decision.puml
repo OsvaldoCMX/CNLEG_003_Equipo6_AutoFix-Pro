@@ -1,0 +1,64 @@
+@startuml 02-secuencia-registrar-decision
+title Secuencia 1 — CU-03 Registrar decisión del cliente (flujo principal)\nUS-006, US-016 · CA-010, CA-011, CA-029 · BPMN Fase 3 «Registrar decisión de autorización»
+skinparam defaultFontName Arial
+skinparam defaultFontSize 13
+skinparam shadowing false
+skinparam dpi 150
+skinparam sequenceMessageAlign center
+skinparam ParticipantPadding 14
+skinparam BoxPadding 8
+autonumber
+
+actor "Asesor de\nServicio" as Asesor
+box "Aplicación" #EAF2FB
+  participant ":ServicioDe\nAutorizacion" as S
+  participant ":UnidadDe\nTrabajo" as U
+end box
+box "Dominio" #FDF2E9
+  participant ":RepositorioDe\nCotizaciones" as RC
+  participant ":RepositorioDe\nOrdenes" as RO
+  participant ":RepositorioDe\nClientes" as RCl
+  participant ":VerificadorDe\nAutorizante" as V
+  participant "cotizacion:\nCotizacion" as C
+  participant "orden:\nOrdenDeServicio" as O
+end box
+box "Infraestructura" #EEF7EE
+  participant ":PublicadorDe\nAlertasInternas" as P
+end box
+
+Asesor -> S : registrar_decision_del_cliente(id_cotizacion,\nlineas_autorizadas, nombre_autorizante)
+activate S
+S -> U : iniciar()
+activate U
+S -> RC : obtener(id_cotizacion)
+RC --> S : cotizacion
+S -> RO : obtener(numero_orden)
+RO --> S : orden
+S -> RCl : obtener(id_cliente)
+RCl --> S : cliente
+S -> V : verificar(cliente, autorizante)
+note right of V : Si es flotilla, solo el Responsable\nde Flotilla puede autorizar (CA-029)
+V --> S : válido
+S -> C : registrar_decision(lineas, autorizante)
+activate C
+C -> C : valida estado «Pendiente de\nAutorización del Cliente»
+C -> C : marca líneas «Autorizada» / «No Autorizado»
+C -> C : estado «Autorizada» o «Autorizada Parcialmente»\n+ evento CotizacionAutorizada
+C --> S : decision (DecisionDelCliente)
+deactivate C
+S -> O : aplicar_decision(decision)
+activate O
+O -> O : crea Trabajos «Pendiente» y «No Autorizado»
+O -> O : estado «Cotizada» → «Autorizada»\n+ evento OrdenAutorizada
+O --> S
+deactivate O
+S -> RC : guardar(cotizacion)
+S -> RO : guardar(orden)
+S -> U : confirmar()
+note right of U : Cotización y Orden se guardan\njuntas o ninguna (ADR-002)
+U --> S : eventos confirmados
+deactivate U
+S -> P : publicar(eventos)
+S --> Asesor : resultado: estado de la cotización y de la orden,\nnúmero de trabajos autorizados / no autorizados
+deactivate S
+@enduml

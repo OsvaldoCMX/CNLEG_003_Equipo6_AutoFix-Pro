@@ -1,0 +1,149 @@
+@startuml 01-diagrama-clases
+!include ../_estilo.iuml
+skinparam classAttributeIconSize 0
+skinparam nodesep 25
+skinparam ranksep 60
+skinparam defaultFontSize 12
+show circle
+left to right direction
+title Diagrama de clases por capas — proceso cotización → autorización → refacciones → entrega (CU-01 a CU-05)
+
+package "CAPA DE APLICACIÓN  ·  Service Layer: coordina los casos de uso, no decide reglas" as APP #EAF2FB {
+  package "Commands (cambian el estado) — un servicio por caso de uso" as CMD #F4F9FE {
+    class ServicioDeCotizacion {
+      +generar_cotizacion(cmd)\n<size:10>cmd: GenerarCotizacion</size>
+    }
+    class ServicioDeAprobacionGerencial {
+      +revisar_cotizacion(cmd)\n<size:10>cmd: RevisarCotizacion</size>
+    }
+    class ServicioDeAutorizacion {
+      +registrar_decision_del_cliente(cmd)\n<size:10>cmd: RegistrarDecisionDelCliente</size>
+    }
+    class ServicioDeRefacciones {
+      +crear_solicitud_de_compra(cmd)\n<size:10>cmd: CrearSolicitudDeCompra</size>
+    }
+    class ServicioDeEntrega {
+      +registrar_entrega(cmd)\n<size:10>cmd: RegistrarEntrega</size>
+    }
+  }
+  package "Queries (solo leen)" as QRY #F4F9FE {
+    class ManejadorConsultarEstadoDeOrden
+    class ManejadorListarSolicitudesPendientes
+    class ManejadorListarCotizacionesPendientesDeAprobacion
+    interface LectorDeOrdenes {
+      +estado_de_orden(numero, placas)
+      +solicitudes_pendientes(hoy)
+      +cotizaciones_pendientes_de_aprobacion()
+    }
+  }
+  abstract class UnidadDeTrabajo {
+    +ordenes : RepositorioDeOrdenes
+    +cotizaciones : RepositorioDeCotizaciones
+    +clientes : RepositorioDeClientes
+    +confirmar()
+    +eventos_confirmados()
+    -deshacer()
+  }
+  interface Reloj {
+    +ahora()
+  }
+  interface PublicadorDeEventos {
+    +publicar(eventos)
+  }
+  interface GeneradorDeDocumentos {
+    +generar_pdf_de_cotizacion(cotizacion)
+  }
+}
+
+package "CAPA DE DOMINIO  ·  reglas e invariantes del negocio" as DOM #FDF2E9 {
+  class Cotizacion <<Aggregate Root>> {
+    +generar(..., politica)
+    +aprobar_por_gerente()
+    +rechazar_por_gerente(observaciones)
+    +marcar_presentada()
+    +registrar_decision(lineas, autorizante)
+  }
+  class OrdenDeServicio <<Aggregate Root>> {
+    +marcar_cotizada()
+    +aplicar_decision(decision)
+    +crear_solicitud_de_compra(...)
+    +registrar_pago(pago)
+    +registrar_cargo_a_credito()
+    +registrar_entrega()
+  }
+  class Cliente <<Aggregate Root>>
+  class VerificadorDeAutorizante <<Domain Service>> {
+    +verificar(cliente, autorizante)
+  }
+  interface PoliticaDeAprobacionGerencial {
+    +requiere_aprobacion(tipo, total)
+  }
+  class PoliticaPorMontoDeCotizacionInicial
+  interface RepositorioDeCotizaciones {
+    +obtener(id) · agregar() · guardar()
+    +siguiente_identidad()
+  }
+  interface RepositorioDeOrdenes {
+    +obtener(numero) · agregar() · guardar()
+    +siguiente_numero()
+  }
+  interface RepositorioDeClientes {
+    +obtener(id) · agregar()
+  }
+  PoliticaPorMontoDeCotizacionInicial ..|> PoliticaDeAprobacionGerencial
+  Cotizacion ..> PoliticaDeAprobacionGerencial
+  RepositorioDeCotizaciones ..> Cotizacion
+  RepositorioDeOrdenes ..> OrdenDeServicio
+  RepositorioDeClientes ..> Cliente
+}
+
+package "CAPA DE INFRAESTRUCTURA  ·  detalles reemplazables (hoy en memoria; después, la base de datos del Data Center)" as INF #EEF7EE {
+  class UnidadDeTrabajoEnMemoria
+  class RepositorioDeOrdenesEnMemoria
+  class RepositorioDeCotizacionesEnMemoria
+  class RepositorioDeClientesEnMemoria
+  class LectorDeOrdenesEnMemoria
+  class PublicadorDeAlertasInternas
+  class RelojDelSistema
+  class GeneradorDeDocumentosSimulado
+}
+
+' --- dependencias de la aplicación (siempre hacia abstracciones)
+ServicioDeCotizacion --> UnidadDeTrabajo
+ServicioDeAprobacionGerencial --> UnidadDeTrabajo
+ServicioDeAutorizacion --> UnidadDeTrabajo
+ServicioDeRefacciones --> UnidadDeTrabajo
+ServicioDeEntrega --> UnidadDeTrabajo
+ServicioDeCotizacion --> GeneradorDeDocumentos
+ServicioDeCotizacion ..> PoliticaDeAprobacionGerencial
+ServicioDeAutorizacion ..> VerificadorDeAutorizante
+ManejadorConsultarEstadoDeOrden --> LectorDeOrdenes
+ManejadorListarSolicitudesPendientes --> LectorDeOrdenes
+ManejadorListarCotizacionesPendientesDeAprobacion --> LectorDeOrdenes
+UnidadDeTrabajo --> RepositorioDeCotizaciones
+UnidadDeTrabajo --> RepositorioDeOrdenes
+UnidadDeTrabajo --> RepositorioDeClientes
+
+' --- la infraestructura implementa las interfaces
+UnidadDeTrabajo <|----- UnidadDeTrabajoEnMemoria
+RepositorioDeOrdenes <|.... RepositorioDeOrdenesEnMemoria
+RepositorioDeCotizaciones <|.... RepositorioDeCotizacionesEnMemoria
+RepositorioDeClientes <|.... RepositorioDeClientesEnMemoria
+LectorDeOrdenes <|..... LectorDeOrdenesEnMemoria
+PublicadorDeEventos <|...... PublicadorDeAlertasInternas
+Reloj <|...... RelojDelSistema
+GeneradorDeDocumentos <|..... GeneradorDeDocumentosSimulado
+
+note as N
+  <b>Cómo leer este diagrama</b>
+  • Las flechas de la aplicación siempre apuntan a <b>interfaces</b>
+    (Unidad de Trabajo, Repositorios, Reloj, Publicador, Generador),
+    nunca a la infraestructura.
+  • La infraestructura <b>implementa</b> esas interfaces (──▷ / ┄┄▷).
+    Cambiar «en memoria» por la base de datos del Data Center
+    solo cambia esta capa.
+  • Todos los servicios usan Reloj y PublicadorDeEventos.
+  • Cada servicio obtiene la raíz de su Aggregate desde la
+    Unidad de Trabajo y le pide la operación (ver secuencias).
+end note
+@enduml
