@@ -1,0 +1,189 @@
+@startuml mapa-dominio
+!include ../_estilo.iuml
+skinparam nodesep 45
+skinparam ranksep 60
+skinparam defaultFontSize 13
+skinparam ArrowFontSize 12
+skinparam packageFontSize 15
+skinparam titleFontSize 20
+skinparam legendFontSize 12
+
+left to right direction
+title AutoFix Pro — Mapa de dominio
+
+' =========================================================== FILA 1: Aggregates de apoyo
+package "Aggregate: Cliente" as PCli #F5FFF5 {
+  class Cliente <<Aggregate Root>> {
+    id · nombre · teléfono · correo
+    tipo : Particular | Flotilla
+    empresa: solo si es flotilla
+  }
+  class ResponsableDeFlotilla <<Value Object>> {
+    nombre · teléfono · correo
+  }
+}
+
+package "Aggregate: Vehículo" as PVeh #F5FAFF {
+  class Vehiculo <<Aggregate Root>> #line.dashed {
+    placas : Placas
+    VIN · marca · modelo · año
+    id_cliente: propietario
+  }
+}
+
+package "Aggregate: Empleado" as PEmp #FAFAFA {
+  class Empleado <<Aggregate Root>> #line.dashed {
+    id · nombre
+    rol : Asesor | Técnico | Gerente
+    | Compras | Caja
+  }
+}
+
+' =========================================================== FILA 2: Aggregate principal
+package "Aggregate: Orden de Servicio" as POrd #EEF5FF {
+  class OrdenDeServicio <<Aggregate Root>> {
+    numero : NumeroOrden
+    estado : EstadoOrden
+    id_cliente · placas · id_tecnico
+    total_autorizado : Dinero
+  }
+  class EstadoDeRecepcion <<Value Object>> #line.dashed {
+    kilometraje · combustible · fotos
+  }
+  class Diagnostico <<Value Object>> #line.dashed {
+    descripción · fecha
+  }
+  class Trabajo <<Entity>> {
+    descripción · importe : Dinero
+    estado : EstadoTrabajo
+  }
+  class FallaAdicional <<Entity>> #line.dashed {
+    descripción · fecha
+  }
+  class SolicitudDeCompra <<Entity>> {
+    refacción · cantidad
+    estado : EstadoSolicitud
+  }
+  class NotaDeResponsabilidad <<Value Object>> #line.dashed {
+    fecha · firmada
+  }
+  class Pago <<Value Object>> {
+    monto · forma de pago
+  }
+  class CargoACredito <<Value Object>> {
+    monto · vence a 15 días
+  }
+  class ReciboInterno <<Entity>> #line.dashed {
+    número · monto · fecha
+  }
+}
+
+' =========================================================== FILA 2: Cotización
+package "Aggregate: Cotización" as PCot #FFF8F0 {
+  class Cotizacion <<Aggregate Root>> {
+    id · numero_orden
+    tipo : Inicial | Adicional
+    versión: v.1, v.2… · estado
+    total : Dinero
+  }
+  class LineaDeCotizacion <<Entity>> {
+    descripción · mano de obra
+    decisión : Autorizada | No Autorizado
+  }
+  class RefaccionCotizada <<Value Object>> {
+    descripción · cantidad · precio
+  }
+  class DecisionDelCliente <<Value Object>> {
+    autorizados · no autorizados · fecha
+  }
+  class Autorizante <<Value Object>> {
+    nombre
+    rol : Cliente | Resp. de Flotilla
+  }
+}
+
+' =========================================================== FILA 3: servicios del dominio
+package "Servicios del dominio" as PSrv #FBF5FF {
+  class PoliticaDeAprobacionGerencial <<Domain Service>> {
+    inicial > $15,000 MXN → Gerente
+  }
+  class VerificadorDeAutorizante <<Domain Service>> {
+    flotilla: solo Resp. de Flotilla
+  }
+  class CalendarioHabil <<Domain Service>> {
+    cuenta días hábiles (L–V)
+  }
+}
+
+' ----------------------------------------------------------- composición dentro de cada Aggregate
+ResponsableDeFlotilla "0..1" --* Cliente
+
+OrdenDeServicio *-- EstadoDeRecepcion : 1
+OrdenDeServicio *-- Diagnostico : 0..1
+OrdenDeServicio *-- Trabajo : 0..*
+OrdenDeServicio *-- FallaAdicional : 0..*
+OrdenDeServicio *-- SolicitudDeCompra : 0..*
+OrdenDeServicio *-- NotaDeResponsabilidad : 0..1
+OrdenDeServicio *-- Pago : 0..1
+OrdenDeServicio *-- CargoACredito : 0..1
+OrdenDeServicio *-- ReciboInterno : 0..1
+
+Cotizacion *-- LineaDeCotizacion : 1..*
+LineaDeCotizacion *-- RefaccionCotizada : 0..*
+Cotizacion *-- DecisionDelCliente : 0..1
+DecisionDelCliente *-- Autorizante : 1
+
+' ----------------------------------------------------------- referencias entre Aggregates (solo por id)
+Cliente <-- Vehiculo : id_cliente
+Cliente <-- OrdenDeServicio : id_cliente
+Vehiculo <-- OrdenDeServicio : placas
+Empleado <-- OrdenDeServicio : id_tecnico
+OrdenDeServicio <-- Cotizacion : numero_orden
+
+' ----------------------------------------------------------- reglas y eventos (notas sin líneas)
+note as NReglas
+  <b>Reglas que protege cada Aggregate</b>
+  <b>Orden de Servicio</b>
+  1. El estado solo cambia por transiciones válidas (Glosario, «Estados del sistema»).
+  2. Sin diagnóstico no se cotiza; ya cotizada, el diagnóstico no cambia (CA-005, CA-033).
+  3. Solo se piden refacciones para trabajos autorizados (CA-020).
+  4. «En Espera de Refacción» mientras haya solicitudes pendientes; alerta al asesor a los 3 días hábiles (CA-019, CA-023).
+  5. «Lista para Entrega» cuando todos los trabajos autorizados están completados (CA-015).
+  6. Se entrega solo con pago, con cargo a crédito (flotilla, 15 días) o tras rechazo total (CA-039, CA-041 a CA-043).
+  7. El retiro anticipado exige la Nota firmada; al volver, la orden queda al final de la fila (CA-024, CA-025).
+  <b>Cotización</b>
+  8. Inicial > $15,000 MXN requiere aprobación del Gerente; las adicionales no (CA-007).
+  9. El rechazo del Gerente exige observaciones (CA-009). Adicionales = v.2 en adelante.
+  10. Sin respuesta en 48 h desde la presentación se registra el recontacto (CA-040).
+  <b>Cliente</b>
+  11. Flotilla siempre tiene empresa y Responsable de Flotilla; solo él autoriza, el conductor no (CA-028, CA-029).
+end note
+
+note as NEventos
+  <b>Domain Events</b>
+  <i>Orden de Servicio:</i>
+  OrdenAutorizada · FallaAdicionalReportada
+  SolicitudDeCompraCreada · RefaccionDisponible
+  OrdenListaParaEntrega · PagoRegistrado
+  CargoACreditoRegistrado · VehiculoEntregado
+  <i>Cotización:</i>
+  CotizacionGenerada · AprobacionGerencialRequerida
+  CotizacionAprobadaPorGerente · CotizacionRechazadaPorGerente
+  CotizacionPresentada · CotizacionAutorizada
+  CotizacionRechazadaPorCliente
+end note
+
+
+PoliticaDeAprobacionGerencial -[hidden]right- VerificadorDeAutorizante
+VerificadorDeAutorizante -[hidden]right- CalendarioHabil
+NReglas -[hidden]right- NEventos
+
+legend bottom
+  <b>Cómo leer:</b> cada recuadro grande es un <b>Aggregate</b>; su objeto naranja es la <b>raíz</b> (todo cambio pasa por ella).
+  Azul = <b>Entidad</b> (tiene identidad propia) · Verde = <b>Value Object</b> (se define por sus valores) · Morado = <b>Servicio del dominio</b>.
+  Línea con rombo = la parte vive dentro del Aggregate · Flecha simple = referencia a otro Aggregate <b>solo por identificador</b> (el texto de la flecha es el dato que se guarda).
+  Borde continuo: participa en los 5 casos de uso de la Unidad 3 · Borde punteado: alcance del BRD que se construye en el proyecto final.
+  Uso de servicios: la Cotización consulta la Política de aprobación al generarse; el Verificador revisa al Cliente al registrar la decisión;
+  la Orden usa el Calendario hábil para el plazo de refacciones.
+endlegend
+@enduml
