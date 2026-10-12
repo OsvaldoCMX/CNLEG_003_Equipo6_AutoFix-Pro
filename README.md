@@ -10,7 +10,7 @@
 | Osvaldo Salvador Cárdenas Mejorado | 2141553 |
 | Abraham Sandoval De León | 2136604 |
 
-AutoFix Pro es un taller automotriz de diagnóstico y reparación. Este repositorio convierte el análisis de la Unidad 2 (BRD, User Stories con Gherkin, Glosario y BPMN) en una propuesta de arquitectura de software, que servirá de base para construir la aplicación en el proyecto final.
+AutoFix Pro es un taller automotriz de diagnóstico y reparación. Este repositorio convierte el análisis de la Unidad 2 (BRD, User Stories con Gherkin, Glosario y BPMN) en una propuesta de arquitectura de software, que servirá de base para construir la aplicación en el proyecto final (PIA).
 
 ## Alcance del diseño
 
