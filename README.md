@@ -18,7 +18,6 @@ Diseño arquitectural del sistema del taller automotriz AutoFix Pro.
 AutoFixPro-Arquitectura-U3/
 ├── docs/
 │   ├── informe-arquitectura.pdf        Informe general (guía de la Unidad 3 llenada)
-│   ├── resumen-unidad3.pdf             Resumen integral de la unidad (el que se sube a Netacad)
 │   ├── adr/                            Los 5 ADR en un solo documento (.pdf)
 │   ├── trazabilidad/                   Matriz de trazabilidad (.xlsx editable y .pdf)
 │   ├── bitacora-ia/                    Bitácora de uso de IA (.pdf)
