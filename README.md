@@ -18,7 +18,7 @@ Diseño arquitectural del sistema del taller automotriz AutoFix Pro.
 AutoFixPro-Arquitectura-U3/
 ├── docs/
 │   ├── informe-arquitectura.pdf        Informe general (guía de la Unidad 3 llenada)
-│   ├── adr/                            Los 5 ADR en un solo documento (.pdf)
+│   ├── adr/                            Los ADR (.pdf)
 │   ├── trazabilidad/                   Matriz de trazabilidad (.xlsx editable y .pdf)
 │   ├── bitacora-ia/                    Bitácora de uso de IA (.pdf)
 │   └── unidad2/                        Insumos de la Unidad 2 (BRD, User Stories, Glosario, BPMN)
@@ -26,7 +26,7 @@ AutoFixPro-Arquitectura-U3/
 │   ├── _estilo.iuml                    Estilo común de PlantUML
 │   ├── dominio/                        Mapa de dominio (.puml, .pdf, .png)
 │   └── uml/                            Diagrama de clases y 2 diagramas de secuencia (.puml, .pdf, .png)
-├── src/autofix/                        Código base (entregable 06)
+├── src/autofix/                        Código base
 │   ├── dominio/                        Aggregates, entidades, Value Objects, reglas, eventos e interfaces de Repository
 │   ├── aplicacion/                     Application Services, Commands, Queries, Unidad de Trabajo y puertos
 │   ├── infraestructura/                Implementaciones en memoria (proyecto final: base de datos del Data Center)
